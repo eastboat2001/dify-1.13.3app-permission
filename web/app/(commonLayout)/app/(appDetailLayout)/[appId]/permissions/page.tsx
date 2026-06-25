@@ -15,9 +15,11 @@ import { usePathname } from '@/next/navigation'
 import { fetchAppPermissions, updateAppPermissions } from '@/service/apps'
 import { useMembers } from '@/service/use-common'
 import { cn } from '@/utils/classnames'
+import MemberPermissionPicker from './member-picker'
 import {
   getAppIdFromPathname,
   getEditInheritedUseMemberIds,
+  isUseOnlyCreatorScopeBlocked,
   normalizePermissionDraftForEditAccess,
 } from './utils'
 
@@ -34,6 +36,7 @@ type ScopeOptionProps<T extends string> = {
   option: PermissionOption<T>
   selected: boolean
   disabled?: boolean
+  disabledReason?: string
   onSelect: (value: T) => void
 }
 
@@ -41,6 +44,7 @@ const ScopeOption = <T extends string>({
   option,
   selected,
   disabled,
+  disabledReason,
   onSelect,
 }: ScopeOptionProps<T>) => {
   const Icon = option.icon
@@ -63,83 +67,11 @@ const ScopeOption = <T extends string>({
       <span className="min-w-0">
         <span className="block text-sm font-medium text-text-primary">{option.title}</span>
         <span className="mt-0.5 block text-xs leading-5 text-text-tertiary">{option.description}</span>
+        {disabled && disabledReason && (
+          <span className="mt-0.5 block text-xs leading-5 text-text-tertiary">{disabledReason}</span>
+        )}
       </span>
     </button>
-  )
-}
-
-type MemberSelectorProps = {
-  title: string
-  emptyText: string
-  members: Member[]
-  selectedIds: string[]
-  lockedIds?: string[]
-  lockedLabel?: string
-  disabled?: boolean
-  getRoleLabel: (role: Member['role']) => string
-  onChange: (ids: string[]) => void
-}
-
-const MemberSelector = ({
-  title,
-  emptyText,
-  members,
-  selectedIds,
-  lockedIds = [],
-  lockedLabel,
-  disabled,
-  getRoleLabel,
-  onChange,
-}: MemberSelectorProps) => {
-  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds])
-  const lockedSet = useMemo(() => new Set(lockedIds), [lockedIds])
-  const toggleMember = useCallback((memberId: string) => {
-    if (disabled || lockedSet.has(memberId))
-      return
-    const next = selectedSet.has(memberId)
-      ? selectedIds.filter(id => id !== memberId)
-      : [...selectedIds, memberId]
-    onChange(next)
-  }, [disabled, lockedSet, onChange, selectedIds, selectedSet])
-
-  return (
-    <div className="rounded-lg border border-components-panel-border bg-background-section-burn p-3">
-      <div className="mb-2 text-xs font-medium uppercase text-text-tertiary">{title}</div>
-      <div className="max-h-[260px] overflow-y-auto">
-        {members.length === 0 && (
-          <div className="px-2 py-3 text-sm text-text-tertiary">{emptyText}</div>
-        )}
-        {members.map((member) => {
-          const isLocked = lockedSet.has(member.id)
-          return (
-            <button
-              key={member.id}
-              type="button"
-              disabled={disabled || isLocked}
-              className={cn(
-                'flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-state-base-hover',
-                (disabled || isLocked) && 'cursor-not-allowed opacity-60',
-              )}
-              onClick={() => toggleMember(member.id)}
-            >
-              <input
-                type="checkbox"
-                readOnly
-                checked={selectedSet.has(member.id)}
-                className="size-4 shrink-0 rounded border-components-checkbox-border"
-              />
-              <span className="min-w-0 grow">
-                <span className="block truncate text-sm font-medium text-text-secondary">{member.name || member.email}</span>
-                <span className="block truncate text-xs text-text-tertiary">{member.email}</span>
-              </span>
-              <span className="shrink-0 rounded bg-components-badge-bg-dimm px-2 py-0.5 text-xs text-text-tertiary">
-                {isLocked && lockedLabel ? lockedLabel : getRoleLabel(member.role)}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-    </div>
   )
 }
 
@@ -200,6 +132,7 @@ const AppPermissionsPage = () => {
   const useScope = normalizedCurrentPermission.use_scope
   const editMembers = normalizedCurrentPermission.edit_members
   const useMembersValue = normalizedCurrentPermission.use_members
+  const isUseOnlyCreatorDisabled = isUseOnlyCreatorScopeBlocked(editInheritedUseMemberIds, permissionData?.creator_id)
 
   const roleLabels = useMemo<Record<Member['role'], string>>(() => ({
     owner: t('members.owner', { ns: 'common' }),
@@ -356,7 +289,7 @@ const AppPermissionsPage = () => {
             ))}
           </div>
           {editScope === 'selected_editors' && (
-            <MemberSelector
+            <MemberPermissionPicker
               title={t('permission.edit.memberSelector', { ns: 'app' })}
               emptyText={t('permission.noEditableMembers', { ns: 'app' })}
               members={editableMembers}
@@ -374,18 +307,26 @@ const AppPermissionsPage = () => {
             <p className="mt-1 text-sm text-text-tertiary">{t('permission.use.description', { ns: 'app' })}</p>
           </div>
           <div className="grid gap-3">
-            {useOptions.map(option => (
-              <ScopeOption
-                key={option.value}
-                option={option}
-                selected={useScope === option.value}
-                disabled={isReadonly}
-                onSelect={value => updatePermissionDraft({ use_scope: value })}
-              />
-            ))}
+            {useOptions.map((option) => {
+              const isDisabledByEditAccess = option.value === 'only_creator' && isUseOnlyCreatorDisabled
+              return (
+                <ScopeOption
+                  key={option.value}
+                  option={option}
+                  selected={useScope === option.value}
+                  disabled={isReadonly || isDisabledByEditAccess}
+                  disabledReason={
+                    !isReadonly && isDisabledByEditAccess
+                      ? t('permission.use.onlyCreator.disabledByEditAccess', { ns: 'app' })
+                      : undefined
+                  }
+                  onSelect={value => updatePermissionDraft({ use_scope: value })}
+                />
+              )
+            })}
           </div>
           {useScope === 'selected_members' && (
-            <MemberSelector
+            <MemberPermissionPicker
               title={t('permission.use.memberSelector', { ns: 'app' })}
               emptyText={t('permission.noMembers', { ns: 'app' })}
               members={activeMembers}

@@ -84,6 +84,128 @@
 
 ### 需求 / 背景
 
+- 手动测试和 UI 评审发现：应用权限页在“指定工作区编辑者”或“指定团队成员”模式下直接展开完整成员列表。
+- 当工作区成员数量较多时，内嵌列表会占据大量竖向空间，搜索、筛选、批量选择和阅读体验都会下降。
+- 期望改为“页面摘要 + 弹窗选择器”：页面只展示已选人数和少量成员摘要，点击后在弹窗中搜索、按角色筛选、只看已选、批量选择当前结果，并保留“由编辑权包含”的锁定成员逻辑。
+
+### 变更摘要
+
+- 新增 `MemberPermissionPicker` 弹窗组件，替代权限页原有内嵌长列表。
+- 成员选择弹窗支持搜索姓名/邮箱、按角色筛选、只看已选、选择当前结果、清空可取消项。
+- 使用权限弹窗继续支持锁定由编辑权继承的成员，锁定成员不可取消。
+- 抽出并测试成员筛选、批量选择、清空和摘要计算工具函数。
+
+### 文件变更
+
+| 类型 | 文件路径 | 说明 |
+| --- | --- | --- |
+| 新增 | `web/app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/member-picker.tsx` | 新增成员权限选择器组件，提供摘要卡片和弹窗选择体验。 |
+| 修改 | `web/app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/page.tsx` | 用 `MemberPermissionPicker` 替换旧的内嵌成员列表。 |
+| 修改 | `web/app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/utils.ts` | 新增成员筛选、批量添加、清空可取消成员和摘要计算工具函数。 |
+| 修改 | `web/app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/utils.spec.ts` | 新增成员筛选、批量操作和摘要计算单元测试。 |
+| 修改 | `web/i18n/en-US/app.json` | 新增成员选择弹窗英文文案。 |
+| 修改 | `web/i18n/zh-Hans/app.json` | 新增成员选择弹窗中文文案。 |
+| 修改 | `docs/development-records.md` | 追加本次开发记录。 |
+
+### 配置 / 环境变更
+
+- 无。
+
+### 数据库变更
+
+- 无。
+
+### 验证方式
+
+- 红测：`node node_modules/vite-plus/bin/vp test --run "app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/utils.spec.ts"`
+  - 结果：新增 5 个用例在实现前失败，原因是成员选择工具函数尚不存在。
+- 单元测试：`node node_modules/vite-plus/bin/vp test --run "app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/utils.spec.ts"`
+  - 结果：`1 passed`，`14 passed`。
+- 类型检查：`node_modules\.bin\tsgo.cmd --noEmit`
+  - 结果：通过，无输出错误。
+- 目标 lint：`node node_modules/eslint/bin/eslint.js --pass-on-unpruned-suppressions "app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/page.tsx" "app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/member-picker.tsx" "app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/utils.ts" "app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/utils.spec.ts"`
+  - 结果：0 errors，4 warnings；warning 为 `page.tsx` 既有 Remixicon 图标可替换为 Tailwind icon class，本次未扩大。
+
+### 与原始版本对比说明
+
+- 相比 Dify 1.13.3 原始版本，继续完善二次开发新增的应用级权限管理前端体验。
+- 不涉及后端接口、权限模型、数据库结构或迁移脚本。
+- 弹窗使用当前项目推荐的 `@/app/components/base/ui/dialog`，没有继续使用已废弃的 legacy `Modal`。
+
+### 回退方式
+
+- 删除 `web/app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/member-picker.tsx`。
+- 回退 `page.tsx` 中对 `MemberPermissionPicker` 的引用，恢复旧的内嵌成员列表。
+- 回退 `utils.ts`、`utils.spec.ts` 和 i18n 文案变更。
+- 不需要数据库回滚。
+
+### 备注 / 后续事项
+
+- 手动测试时重点确认：成员较多时页面高度保持稳定；弹窗搜索、角色筛选、只看已选、选择当前结果、清空可取消项和锁定成员均符合预期。
+- 后续如果接入部门、用户组或组织架构，可以在该弹窗内继续扩展筛选维度，不需要再扩大权限页主体布局。
+
+## 2026-06-25
+
+### 需求 / 背景
+
+- 手动测试发现：当编辑权限选择“指定工作区成员”且包含非创建者时，使用权限中的“仅创建者”虽然会被自动纠正为“指定团队成员”，但界面仍看起来可选择，容易让用户误解。
+- 权限规则要求：拥有应用编辑权的成员必须同时拥有使用权，因此当编辑权已覆盖非创建者时，使用权不能设置为“仅创建者”。
+- 期望行为：此类情况下“使用权限 / 仅创建者”直接显示为不可选择，并说明禁用原因。
+
+### 变更摘要
+
+- 新增前端工具函数 `isUseOnlyCreatorScopeBlocked`，用于判断“仅创建者”使用范围是否被编辑权继承规则阻止。
+- 权限管理页在编辑权覆盖非创建者时，将使用权限“仅创建者”选项置灰，并显示禁用原因。
+- 补充中英文 i18n 文案和工具函数单元测试。
+
+### 文件变更
+
+| 类型 | 文件路径 | 说明 |
+| --- | --- | --- |
+| 修改 | `web/app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/utils.ts` | 新增“仅创建者使用权限是否应禁用”的判断函数，并复用到权限归一化逻辑。 |
+| 修改 | `web/app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/utils.spec.ts` | 增加编辑权继承使用权导致“仅创建者”不可选的单元测试。 |
+| 修改 | `web/app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/page.tsx` | 使用权限“仅创建者”在不满足规则时置灰，并展示不可选原因。 |
+| 修改 | `web/i18n/en-US/app.json` | 新增英文禁用原因文案。 |
+| 修改 | `web/i18n/zh-Hans/app.json` | 新增中文禁用原因文案。 |
+| 修改 | `docs/development-records.md` | 追加本次开发记录。 |
+
+### 配置 / 环境变更
+
+- 无。
+
+### 数据库变更
+
+- 无。
+
+### 验证方式
+
+- 红测：`node node_modules/vite-plus/bin/vp test --run "app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/utils.spec.ts"`
+  - 结果：新增 2 个用例在实现前失败，原因是 `isUseOnlyCreatorScopeBlocked is not a function`。
+- 单元测试：`node node_modules/vite-plus/bin/vp test --run "app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/utils.spec.ts"`
+  - 结果：`1 passed`，`9 passed`。
+- 类型检查：`node_modules\.bin\tsgo.cmd --noEmit`
+  - 结果：通过，无输出错误。
+- 目标 lint：`node node_modules/eslint/bin/eslint.js --pass-on-unpruned-suppressions "app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/page.tsx" "app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/utils.ts" "app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/utils.spec.ts"`
+  - 结果：0 errors，4 warnings；warning 为 `prefer-tailwind-icons`，来源于该页面既有 Remixicon 用法，本次未扩大。
+
+### 与原始版本对比说明
+
+- 相比 Dify 1.13.3 原始版本，继续完善二次开发新增的应用级权限页交互。
+- 不涉及后端接口、数据库结构或权限模型变更；仅让前端状态更清楚地表达既有权限规则。
+
+### 回退方式
+
+- 回退本条记录中列出的前端和 i18n 文件改动。
+- 不需要数据库回滚。
+
+### 备注 / 后续事项
+
+- 手动测试时重点确认：编辑权限包含非创建者时，“使用权限 / 仅创建者”置灰并显示说明；切回“仅创建者”编辑权限后，该使用权限选项恢复可选。
+
+## 2026-06-25
+
+### 需求 / 背景
+
 - 手动测试发现：非公开 Web App URL 跳转到控制台登录页后，右上角出现 `App with code null not found` 弹窗，但不影响继续登录。
 - 根因：跳转过程中 `WebAppStoreProvider` 会把 shareCode 清空为 `null`，但 share layout 的 `Splash` 仍继续调用 `webAppLoginStatus(shareCode!)`，导致请求 `/api/login/status?app_code=null`。
 - 期望行为：shareCode 缺失时不应请求任何 Web App 登录状态接口，也不应向后端发送 `app_code=null`。

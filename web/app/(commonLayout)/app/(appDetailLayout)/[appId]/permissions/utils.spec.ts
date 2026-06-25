@@ -1,9 +1,33 @@
+import type { Member } from '@/models/common'
 import { describe, expect, it } from 'vitest'
 import {
+  addPermissionMembers,
+  clearSelectablePermissionMembers,
+  filterPermissionMembers,
   getAppIdFromPathname,
   getEditInheritedUseMemberIds,
+  getPermissionMemberSummary,
+  isUseOnlyCreatorScopeBlocked,
   normalizePermissionDraftForEditAccess,
 } from './utils'
+
+const createMember = (
+  id: string,
+  role: Member['role'],
+  name: string,
+  email = `${id}@test.local`,
+): Member => ({
+  id,
+  name,
+  email,
+  avatar: '',
+  avatar_url: '',
+  created_at: '2026-06-25T00:00:00Z',
+  last_active_at: '2026-06-25T00:00:00Z',
+  last_login_at: '2026-06-25T00:00:00Z',
+  role,
+  status: 'active',
+})
 
 describe('getAppIdFromPathname', () => {
   it('returns app id from app detail permission route', () => {
@@ -72,6 +96,70 @@ describe('normalizePermissionDraftForEditAccess', () => {
       edit_members: ['editor1'],
       use_scope: 'selected_members',
       use_members: ['creator', 'editor1'],
+    })
+  })
+})
+
+describe('isUseOnlyCreatorScopeBlocked', () => {
+  it('blocks only creator use scope when edit access grants use to another member', () => {
+    expect(isUseOnlyCreatorScopeBlocked(['creator', 'editor1'], 'creator')).toBe(true)
+  })
+
+  it('allows only creator use scope when inherited use access only contains the creator', () => {
+    expect(isUseOnlyCreatorScopeBlocked(['creator'], 'creator')).toBe(false)
+  })
+})
+
+describe('filterPermissionMembers', () => {
+  const members = [
+    createMember('owner1', 'owner', 'Eastboat', 'eastboat@example.com'),
+    createMember('admin1', 'admin', 'Admin One', 'admin1@test.local'),
+    createMember('editor1', 'editor', 'Editor One', 'editor1@test.local'),
+    createMember('member1', 'normal', 'Member One', 'member1@test.local'),
+  ]
+
+  it('filters members by search text, role, and selected state', () => {
+    expect(filterPermissionMembers(members, {
+      searchValue: 'one',
+      roleFilter: 'editor',
+      onlySelected: true,
+      selectedIds: ['editor1', 'member1'],
+    })).toEqual([members[2]])
+  })
+
+  it('matches member email when search text does not match the name', () => {
+    expect(filterPermissionMembers(members, {
+      searchValue: 'admin1@test',
+      roleFilter: 'all',
+      onlySelected: false,
+      selectedIds: [],
+    })).toEqual([members[1]])
+  })
+})
+
+describe('permission member batch helpers', () => {
+  it('adds filtered members without duplicating existing selections', () => {
+    expect(addPermissionMembers(['owner1', 'editor1'], ['editor1', 'admin1'])).toEqual(['owner1', 'editor1', 'admin1'])
+  })
+
+  it('keeps locked members when clearing selectable members', () => {
+    expect(clearSelectablePermissionMembers(['owner1', 'editor1', 'member1'], ['editor1'])).toEqual(['editor1'])
+  })
+})
+
+describe('getPermissionMemberSummary', () => {
+  it('returns selected members in selection order with overflow count', () => {
+    const members = [
+      createMember('owner1', 'owner', 'Eastboat'),
+      createMember('editor1', 'editor', 'Editor One'),
+      createMember('admin1', 'admin', 'Admin One'),
+      createMember('member1', 'normal', 'Member One'),
+    ]
+
+    expect(getPermissionMemberSummary(members, ['member1', 'owner1', 'admin1', 'editor1'], 2)).toEqual({
+      selectedCount: 4,
+      visibleMembers: [members[3], members[0]],
+      overflowCount: 2,
     })
   })
 })
