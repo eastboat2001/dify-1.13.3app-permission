@@ -221,6 +221,7 @@ mise.toml
 
 
 # AI Assistant
+.github/
 .roo/
 /.claude/worktrees/
 .agents/

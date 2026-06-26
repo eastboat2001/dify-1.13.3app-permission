@@ -80,6 +80,60 @@
 - 记录未完成事项、临时方案、风险点或后续优化建议。
 ```
 
+## 2026-06-26
+
+### 需求 / 背景
+
+- GitHub 仓库上传后自动出现 Dependabot 分支和 PR，来源于原始 Dify 仓库自带的 `.github/dependabot.yml` 与工作流配置。
+- 当前二次开发仓库不需要上传 `.github/` 下的 GitHub Actions、Dependabot、Issue/PR 模板等上游协作配置。
+- 期望后续提交和上传不再包含 `.github/` 文件夹，并让远程仓库在推送后移除该目录。
+
+### 变更摘要
+
+- 将 `.github/` 加入 `.gitignore`。
+- 使用 `git rm -r --cached -- .github` 将 `.github/` 从 Git 跟踪中移除，但保留本地文件夹。
+
+### 文件变更
+
+| 类型 | 文件路径 | 说明 |
+| --- | --- | --- |
+| 修改 | `.gitignore` | 新增 `.github/` 忽略规则，避免后续再次上传 GitHub 配置目录。 |
+| 删除跟踪 | `.github/` | 从 Git 索引中移除上游 GitHub 配置目录；本地文件仍保留。 |
+| 修改 | `docs/development-records.md` | 追加本次仓库清理记录。 |
+
+### 配置 / 环境变更
+
+- Git 忽略规则新增：`.github/`。
+- GitHub 远程仓库在提交并推送本次变更后，将不再包含 `.github/`，Dependabot 配置和 Actions 工作流也会随之移除。
+
+### 数据库变更
+
+- 无。
+
+### 验证方式
+
+- 命令：`Test-Path .github`
+  - 结果：`True`，确认本地 `.github` 文件夹未被物理删除。
+- 命令：`git check-ignore -v .github/dependabot.yml`
+  - 结果：命中 `.gitignore` 中 `.github/` 规则。
+- 命令：`git status --short`
+  - 结果：`.github/` 下文件显示为 `D`，表示从 Git 跟踪中删除；`.gitignore` 和本文档显示为修改。
+
+### 与原始版本对比说明
+
+- 相比 Dify 1.13.3 原始版本，二次开发仓库不再保留上游 GitHub 协作自动化配置。
+- 该变更不影响本地源码运行、后端、前端、数据库或应用权限功能。
+
+### 回退方式
+
+- 从 `.gitignore` 删除 `.github/` 规则。
+- 重新执行 `git add .github`，将 `.github/` 纳入版本控制。
+
+### 备注 / 后续事项
+
+- 提交并推送本次变更后，GitHub 上已有的 Dependabot PR 可以手动关闭；相关远程 `dependabot/...` 分支也可以在 GitHub 页面删除。
+- 如果未来需要 GitHub Actions 或 Issue/PR 模板，可以重新恢复 `.github/`。
+
 ## 2026-06-25
 
 ### 需求 / 背景
