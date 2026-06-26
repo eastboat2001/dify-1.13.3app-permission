@@ -84,6 +84,60 @@
 
 ### 需求 / 背景
 
+- UI 评审发现：选择“指定工作区编辑者”或“指定团队成员”后，成员管理摘要会出现在三组选项卡片下方的独立卡片里。
+- 该表现让“指定成员”选项和“管理成员”入口在视觉上被拆成两个模块，用户会感觉设置入口割裂。
+- 期望将成员摘要和“管理成员”按钮直接集成到对应的“指定...”选项卡片内部，使选项和详细配置形成一个整体。
+
+### 变更摘要
+
+- `ScopeOption` 支持选中状态下渲染内部扩展内容。
+- 将编辑权限和使用权限的 `MemberPermissionPicker` 嵌入对应的“指定工作区编辑者 / 指定团队成员”选项卡片内部。
+- `MemberPermissionPicker` 移除自身外层卡片边框，只保留摘要、管理按钮和弹窗逻辑，避免卡片套卡片。
+
+### 文件变更
+
+| 类型 | 文件路径 | 说明 |
+| --- | --- | --- |
+| 修改 | `web/app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/page.tsx` | 权限选项卡片支持内部扩展区，并将成员管理入口集成到指定成员选项内。 |
+| 修改 | `web/app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/member-picker.tsx` | 去除独立外层卡片样式，改为可嵌入选项卡片的成员摘要与弹窗入口。 |
+| 修改 | `docs/development-records.md` | 追加本次 UI 整合记录。 |
+
+### 配置 / 环境变更
+
+- 无。
+
+### 数据库变更
+
+- 无。
+
+### 验证方式
+
+- 单元测试：`node node_modules/vite-plus/bin/vp test --run "app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/utils.spec.ts"`
+  - 结果：`1 passed`，`14 passed`。
+- 类型检查：`node_modules\.bin\tsgo.cmd --noEmit`
+  - 结果：通过，无输出错误。
+- 目标 lint：`node node_modules/eslint/bin/eslint.js --pass-on-unpruned-suppressions "app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/page.tsx" "app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/member-picker.tsx" "app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/utils.ts" "app/(commonLayout)/app/(appDetailLayout)/[appId]/permissions/utils.spec.ts"`
+  - 结果：0 errors，4 warnings；warning 为 `page.tsx` 既有 Remixicon 图标可替换为 Tailwind icon class，本次未扩大。
+
+### 与原始版本对比说明
+
+- 相比 Dify 1.13.3 原始版本，继续完善二次开发新增的应用级权限管理前端体验。
+- 不涉及后端接口、权限模型、数据库结构或迁移脚本。
+
+### 回退方式
+
+- 回退 `page.tsx` 中 `ScopeOption` 内部扩展区和 `MemberPermissionPicker` 嵌入逻辑。
+- 回退 `member-picker.tsx` 外层卡片样式移除改动。
+- 不需要数据库回滚。
+
+### 备注 / 后续事项
+
+- 手动测试时重点确认：选择“指定工作区编辑者/指定团队成员”后，成员摘要和“管理成员”按钮显示在同一个选项卡片内部；点击按钮仍能打开弹窗，且不会误触发切换选项。
+
+## 2026-06-26
+
+### 需求 / 背景
+
 - GitHub 仓库上传后自动出现 Dependabot 分支和 PR，来源于原始 Dify 仓库自带的 `.github/dependabot.yml` 与工作流配置。
 - 当前二次开发仓库不需要上传 `.github/` 下的 GitHub Actions、Dependabot、Issue/PR 模板等上游协作配置。
 - 期望后续提交和上传不再包含 `.github/` 文件夹，并让远程仓库在推送后移除该目录。

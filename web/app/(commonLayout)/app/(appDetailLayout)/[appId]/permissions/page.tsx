@@ -1,6 +1,6 @@
 'use client'
 
-import type { ComponentType } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 import type { PermissionDraft } from './utils'
 import type { Member } from '@/models/common'
 import type { AppEditPermissionScope, AppPermissionUpdatePayload, AppUsePermissionScope } from '@/types/app'
@@ -37,6 +37,7 @@ type ScopeOptionProps<T extends string> = {
   selected: boolean
   disabled?: boolean
   disabledReason?: string
+  children?: ReactNode
   onSelect: (value: T) => void
 }
 
@@ -45,33 +46,43 @@ const ScopeOption = <T extends string>({
   selected,
   disabled,
   disabledReason,
+  children,
   onSelect,
 }: ScopeOptionProps<T>) => {
   const Icon = option.icon
 
   return (
-    <button
-      type="button"
-      disabled={disabled}
+    <div
       className={cn(
-        'flex min-h-[72px] w-full items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors',
+        'w-full rounded-lg border px-4 py-3 transition-colors',
         selected
           ? 'border-state-accent-solid bg-state-accent-hover'
           : 'border-components-panel-border bg-components-panel-bg hover:bg-state-base-hover',
         disabled && 'cursor-not-allowed opacity-60',
       )}
-      onClick={() => onSelect(option.value)}
     >
-      <Radio isChecked={selected} disabled={disabled} />
-      <Icon className="h-5 w-5 shrink-0 text-text-secondary" />
-      <span className="min-w-0">
-        <span className="block text-sm font-medium text-text-primary">{option.title}</span>
-        <span className="mt-0.5 block text-xs leading-5 text-text-tertiary">{option.description}</span>
-        {disabled && disabledReason && (
-          <span className="mt-0.5 block text-xs leading-5 text-text-tertiary">{disabledReason}</span>
-        )}
-      </span>
-    </button>
+      <button
+        type="button"
+        disabled={disabled}
+        className="flex min-h-12 w-full items-center gap-3 text-left"
+        onClick={() => onSelect(option.value)}
+      >
+        <Radio isChecked={selected} disabled={disabled} />
+        <Icon className="h-5 w-5 shrink-0 text-text-secondary" />
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-text-primary">{option.title}</span>
+          <span className="mt-0.5 block text-xs leading-5 text-text-tertiary">{option.description}</span>
+          {disabled && disabledReason && (
+            <span className="mt-0.5 block text-xs leading-5 text-text-tertiary">{disabledReason}</span>
+          )}
+        </span>
+      </button>
+      {selected && children && (
+        <div className="ml-12 mt-3 border-t border-divider-subtle pt-3">
+          {children}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -285,20 +296,21 @@ const AppPermissionsPage = () => {
                 selected={editScope === option.value}
                 disabled={isReadonly}
                 onSelect={value => updatePermissionDraft({ edit_scope: value })}
-              />
+              >
+                {option.value === 'selected_editors' && (
+                  <MemberPermissionPicker
+                    title={t('permission.edit.memberSelector', { ns: 'app' })}
+                    emptyText={t('permission.noEditableMembers', { ns: 'app' })}
+                    members={editableMembers}
+                    selectedIds={editMembers}
+                    disabled={isReadonly}
+                    getRoleLabel={role => roleLabels[role]}
+                    onChange={ids => updatePermissionDraft({ edit_members: ids })}
+                  />
+                )}
+              </ScopeOption>
             ))}
           </div>
-          {editScope === 'selected_editors' && (
-            <MemberPermissionPicker
-              title={t('permission.edit.memberSelector', { ns: 'app' })}
-              emptyText={t('permission.noEditableMembers', { ns: 'app' })}
-              members={editableMembers}
-              selectedIds={editMembers}
-              disabled={isReadonly}
-              getRoleLabel={role => roleLabels[role]}
-              onChange={ids => updatePermissionDraft({ edit_members: ids })}
-            />
-          )}
         </section>
 
         <section className="flex flex-col gap-3">
@@ -321,23 +333,24 @@ const AppPermissionsPage = () => {
                       : undefined
                   }
                   onSelect={value => updatePermissionDraft({ use_scope: value })}
-                />
+                >
+                  {option.value === 'selected_members' && (
+                    <MemberPermissionPicker
+                      title={t('permission.use.memberSelector', { ns: 'app' })}
+                      emptyText={t('permission.noMembers', { ns: 'app' })}
+                      members={activeMembers}
+                      selectedIds={useMembersValue}
+                      lockedIds={editInheritedUseMemberIds}
+                      lockedLabel={t('permission.use.inheritedFromEdit', { ns: 'app' })}
+                      disabled={isReadonly}
+                      getRoleLabel={role => roleLabels[role]}
+                      onChange={ids => updatePermissionDraft({ use_members: ids })}
+                    />
+                  )}
+                </ScopeOption>
               )
             })}
           </div>
-          {useScope === 'selected_members' && (
-            <MemberPermissionPicker
-              title={t('permission.use.memberSelector', { ns: 'app' })}
-              emptyText={t('permission.noMembers', { ns: 'app' })}
-              members={activeMembers}
-              selectedIds={useMembersValue}
-              lockedIds={editInheritedUseMemberIds}
-              lockedLabel={t('permission.use.inheritedFromEdit', { ns: 'app' })}
-              disabled={isReadonly}
-              getRoleLabel={role => roleLabels[role]}
-              onChange={ids => updatePermissionDraft({ use_members: ids })}
-            />
-          )}
         </section>
       </div>
     </div>

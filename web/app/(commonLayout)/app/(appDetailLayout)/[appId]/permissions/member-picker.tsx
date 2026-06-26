@@ -123,32 +123,30 @@ const MemberPermissionPicker = ({
 
   return (
     <>
-      <div className="rounded-lg border border-components-panel-border bg-background-section-burn p-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-xs font-medium uppercase text-text-tertiary">{title}</div>
-            <div className="mt-1 text-sm font-medium text-text-secondary">
-              {summary.selectedCount > 0
-                ? t('permission.memberPicker.selectedCount', { ns: 'app', count: summary.selectedCount })
-                : emptyText}
-            </div>
-            {summary.selectedCount > 0 && (
-              <div className="mt-1 truncate text-xs text-text-tertiary">
-                {summaryNames}
-                {summary.overflowCount > 0 && (
-                  <span>{t('permission.memberPicker.selectedOverflow', { ns: 'app', count: summary.overflowCount })}</span>
-                )}
-              </div>
-            )}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-medium uppercase text-text-tertiary">{title}</div>
+          <div className="mt-1 text-sm font-medium text-text-secondary">
+            {summary.selectedCount > 0
+              ? t('permission.memberPicker.selectedCount', { ns: 'app', count: summary.selectedCount })
+              : emptyText}
           </div>
-          <Button
-            size="small"
-            disabled={!canOpenPicker}
-            onClick={openPicker}
-          >
-            {disabled ? t('permission.memberPicker.view', { ns: 'app' }) : t('permission.memberPicker.manage', { ns: 'app' })}
-          </Button>
+          {summary.selectedCount > 0 && (
+            <div className="mt-1 truncate text-xs text-text-tertiary">
+              {summaryNames}
+              {summary.overflowCount > 0 && (
+                <span>{t('permission.memberPicker.selectedOverflow', { ns: 'app', count: summary.overflowCount })}</span>
+              )}
+            </div>
+          )}
         </div>
+        <Button
+          size="small"
+          disabled={!canOpenPicker}
+          onClick={openPicker}
+        >
+          {disabled ? t('permission.memberPicker.view', { ns: 'app' }) : t('permission.memberPicker.manage', { ns: 'app' })}
+        </Button>
       </div>
 
       <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
